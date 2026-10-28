@@ -14,6 +14,7 @@ export function closeGlassPopover(focus=true){
   if(!active)return;
   const {panel,anchor}=active;active=null;
   anchor?.setAttribute('aria-expanded','false');
+  anchor?.closest('.theme-dock')?.classList.remove('is-open');
   if(typeof panel.hidePopover==='function'){try{panel.hidePopover();}catch{}}
   panel.remove();
   if(focus&&anchor?.isConnected)anchor.focus({preventScroll:true});
@@ -22,7 +23,8 @@ function placePanel(){
   if(!active)return;
   const {panel,anchor,side}=active;
   if(!anchor.isConnected){closeGlassPopover(false);return;}
-  const a=anchor.getBoundingClientRect(),p=panel.getBoundingClientRect();
+  if(side==='inline')return;
+  const a=anchor.getBoundingClientRect(),p={width:panel.offsetWidth,height:panel.offsetHeight};
   const viewport=window.visualViewport;
   const w=viewport?.width||innerWidth,h=viewport?.height||innerHeight;
   const ox=viewport?.offsetLeft||0,oy=viewport?.offsetTop||0;
@@ -36,12 +38,19 @@ function createPanel(anchor,cls,label,role='dialog',side='below'){
   const panel=document.createElement('div');
   panel.id='glassPopover';panel.className=`glass-popover ${cls}`;
   panel.setAttribute('role',role);panel.setAttribute('aria-label',label);
-  panel.setAttribute('popover','manual');
-  (anchor.closest('dialog[open]')||document.body).append(panel);
+  if(side==='inline'){
+    anchor.closest('.theme-dock').append(panel);
+    anchor.closest('.theme-dock').classList.add('is-open');
+  }else{
+    panel.setAttribute('popover','manual');
+    (anchor.closest('dialog[open]')||document.body).append(panel);
+  }
   anchor.setAttribute('aria-expanded','true');anchor.setAttribute('aria-controls',panel.id);
   active={panel,anchor,side};
-  if(typeof panel.showPopover==='function')panel.showPopover();
-  else panel.removeAttribute('popover');
+  if(side!=='inline'){
+    if(typeof panel.showPopover==='function')panel.showPopover();
+    else panel.removeAttribute('popover');
+  }
   return panel;
 }
 function focusFirst(panel){(panel.querySelector('[aria-pressed="true"],[aria-selected="true"]')||panel.querySelector('button:not(:disabled)'))?.focus({preventScroll:true});}
@@ -180,11 +189,62 @@ function syncNumbers(){
 }
 export function openThemeMenu(anchor,value,onChange){
   if(active?.anchor===anchor){closeGlassPopover();return;}
-  const p=createPanel(anchor,'glass-theme','Оформление','dialog','left');
+  const p=createPanel(anchor,'glass-theme','Оформление','dialog','inline');
   const names={light:'Светлая тема',dark:'Тёмная тема',system:'Как в системе'};
   p.innerHTML=['light','dark','system'].filter(t=>t!==value).map(t=>`<button type="button" data-theme-choice="${t}" aria-label="${names[t]}" title="${names[t]}">${I[t]}</button>`).join('');
   p.addEventListener('click',e=>{const b=e.target.closest('[data-theme-choice]');if(!b)return;closeGlassPopover(false);onChange(b.dataset.themeChoice);requestAnimationFrame(()=>document.querySelector('[data-action=theme]')?.focus({preventScroll:true}));});
-  placePanel();mountRail(p,'button','theme-menu',{remember:false});focusFirst(p);
+  p.addEventListener('keydown',e=>{
+    const buttons=[...p.querySelectorAll('button')],i=buttons.indexOf(e.target);
+    if(i<0||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
+    e.preventDefault();
+    const next=e.key==='Home'?0:e.key==='End'?buttons.length-1:Math.max(0,Math.min(buttons.length-1,i+(e.key==='ArrowRight'?1:-1)));
+    buttons[next]?.focus({preventScroll:true});
+  });
+  focusFirst(p);
+}
+function enhanceThemeDock(dock){
+  if(!dock||dock.dataset.glassReady)return;dock.dataset.glassReady='yes';
+  const anchor=dock.querySelector('[data-action=theme]');
+  let drag=null,thumb=null;
+  const clear=()=>{dock.classList.remove('is-dragging');thumb?.remove();thumb=null;};
+  const follow=e=>{
+    const buttons=[...dock.querySelectorAll('[data-theme-choice]'),anchor],c=dock.getBoundingClientRect();
+    let nearest=anchor,distance=Infinity;
+    for(const b of buttons){const r=b.getBoundingClientRect(),d=Math.abs(e.clientX-r.left-r.width/2);if(d<distance){distance=d;nearest=b;}}
+    drag.target=nearest;
+    if(!thumb){thumb=document.createElement('span');thumb.className='glass-thumb';thumb.setAttribute('aria-hidden','true');dock.append(thumb);}
+    thumb.style.width='44px';thumb.style.height='44px';
+    thumb.style.transform=`translate3d(${Math.max(4,Math.min(dock.clientWidth-44,e.clientX-c.left-22))}px,5px,0)`;
+  };
+  dock.addEventListener('pointerdown',e=>{
+    if(!e.isPrimary||e.button!==0||!e.target.closest('button'))return;
+    drag={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false,wasOpen:active?.anchor===anchor,target:null};
+  });
+  dock.addEventListener('pointermove',e=>{
+    if(!drag||e.pointerId!==drag.id)return;
+    const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+    if(!drag.moved){
+      if(Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>8){drag=null;return;}
+      if(Math.abs(dx)<5)return;
+      drag.moved=true;dock.classList.add('is-dragging');
+      if(active?.anchor!==anchor)anchor.click();
+      dock.setPointerCapture(e.pointerId);
+    }
+    e.preventDefault();follow(e);
+  });
+  const finish=(e,cancel=false)=>{
+    if(!drag||e.pointerId!==drag.id)return;
+    if(drag.moved&&!cancel)follow(e);
+    const ended=drag;drag=null;
+    if(dock.hasPointerCapture(e.pointerId))dock.releasePointerCapture(e.pointerId);
+    clear();if(!ended.moved)return;
+    e.preventDefault();ignorePointerClickUntil=Date.now()+450;
+    if(cancel){if(!ended.wasOpen)closeGlassPopover(false);return;}
+    if(ended.target===anchor)closeGlassPopover();else ended.target?.click();
+  };
+  dock.addEventListener('pointerup',e=>finish(e));
+  dock.addEventListener('pointercancel',e=>finish(e,true));
+  dock.addEventListener('lostpointercapture',e=>{if(e.target===dock)finish(e,true);});
 }
 function mountRail(container,selector,key,{axis='x',remember=true}={}){
   if(!container)return;if(container.dataset.glassRail){railLayouts.get(container)?.reflow();return;}container.dataset.glassRail='yes';
@@ -192,7 +252,8 @@ function mountRail(container,selector,key,{axis='x',remember=true}={}){
   if(!buttons.length)return;
   const selected=()=>buttons.find(b=>b.matches('[aria-pressed=true],.selected'));
   const thumb=document.createElement('span');thumb.className='glass-thumb';thumb.setAttribute('aria-hidden','true');container.prepend(thumb);
-  const bounds=b=>{const c=container.getBoundingClientRect(),r=b.getBoundingClientRect();return{x:r.left-c.left-container.clientLeft,y:r.top-c.top-container.clientTop,w:r.width,h:r.height};};
+  // Layout coordinates remain accurate while a popover's entrance transform runs.
+  const bounds=b=>({x:b.offsetLeft,y:b.offsetTop,w:b.offsetWidth,h:b.offsetHeight});
   let drag=null,position=null;
   const move=(r,save=false)=>{position=r;thumb.style.width=`${r.w}px`;thumb.style.height=`${r.h}px`;thumb.style.transform=`translate3d(${r.x}px,${r.y}px,0)`;thumb.style.opacity='1';if(save&&remember)rails.set(key,r);};
   const highlight=b=>{container.classList.toggle('has-preview',!!b);buttons.forEach(x=>x.classList.toggle('is-preview',x===b));};
@@ -212,7 +273,8 @@ function mountRail(container,selector,key,{axis='x',remember=true}={}){
     const cells=buttons.map(bounds),size=drag.size;
     const minX=Math.min(...cells.map(r=>r.x)),maxX=Math.max(...cells.map(r=>r.x+r.w))-size.w;
     const minY=Math.min(...cells.map(r=>r.y)),maxY=Math.max(...cells.map(r=>r.y+r.h))-size.h;
-    move({w:size.w,h:size.h,x:Math.max(minX,Math.min(maxX,e.clientX-c.left-container.clientLeft-size.w/2)),y:axis==='both'?Math.max(minY,Math.min(maxY,e.clientY-c.top-container.clientTop-size.h/2)):size.y});
+    const scaleX=c.width/container.offsetWidth||1,scaleY=c.height/container.offsetHeight||1;
+    move({w:size.w,h:size.h,x:Math.max(minX,Math.min(maxX,(e.clientX-c.left)/scaleX-container.clientLeft-size.w/2)),y:axis==='both'?Math.max(minY,Math.min(maxY,(e.clientY-c.top)/scaleY-container.clientTop-size.h/2)):size.y});
     if(axis==='both'&&!target)thumb.style.opacity='.25';
   }
   container.addEventListener('pointerdown',e=>{
@@ -252,6 +314,7 @@ export function mountGlassUI(root=document){
   root.querySelectorAll('input[type=date],input[type=month]').forEach(enhanceDate);
   root.querySelectorAll('select').forEach(enhanceSelect);
   root.querySelectorAll('input[type=number]').forEach(enhanceNumber);
+  enhanceThemeDock(root.querySelector('.theme-dock'));
   mountRail(root.querySelector('.view-tabs'),'button','views');
   mountRail(root.querySelector('.week-strip'),'.week-day','days');
   mountRail(root.querySelector('.theme-options'),'button','themes');
@@ -260,10 +323,11 @@ export function mountGlassUI(root=document){
 document.addEventListener('input',()=>requestAnimationFrame(syncNumbers));
 document.addEventListener('pointerdown',e=>{ignorePointerClickUntil=0;if(active&&!active.panel.contains(e.target)&&!active.anchor.contains(e.target))closeGlassPopover(false);},{capture:true});
 document.addEventListener('click',e=>{if(e.isTrusted&&e.detail>0&&Date.now()<ignorePointerClickUntil){e.preventDefault();e.stopImmediatePropagation();ignorePointerClickUntil=0;}},{capture:true});
+document.addEventListener('focusin',e=>{if(active?.side==='inline'&&!active.panel.contains(e.target)&&e.target!==active.anchor)closeGlassPopover(false);});
 document.addEventListener('keydown',e=>{
   if(!active)return;
   if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeGlassPopover();return;}
-  if(e.key==='Tab'){
+  if(e.key==='Tab'&&active.side!=='inline'){
     const list=[...active.panel.querySelectorAll('button:not(:disabled),[tabindex="0"]')];
     if(!list.length)return;
     const first=list[0],last=list.at(-1);

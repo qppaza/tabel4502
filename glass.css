@@ -68,11 +68,20 @@ button,input,select,textarea{font-family:inherit}
 .group-symbol svg{width:15px;height:15px}
 .workspace{grid-template-columns:320px minmax(0,1fr);gap:32px;padding:28px 0 24px}
 .sidebar{display:block;position:sticky;top:24px;align-self:start;min-height:0;padding:0}
-.intro{position:relative;min-height:104px;padding-right:60px}
+.intro{position:relative;min-height:104px;padding:0;display:grid;grid-template-columns:minmax(0,1fr) 44px;column-gap:16px;row-gap:8px}
 .intro h1{font-size:32px;line-height:1.15;letter-spacing:-1.1px;margin:10px 0 8px;font-weight:650}
 .intro p{font-size:13px;line-height:1.5;color:var(--muted)}
 .intro .eyebrow{font-size:11px;line-height:1.5;letter-spacing:.65px}
-.side-controls{position:absolute;right:0;top:0;display:flex;flex-direction:column;gap:8px}
+.intro .intro-heading h1{margin-bottom:0}
+.intro-help{align-self:start;justify-self:end}
+.intro-bottom{grid-column:1/-1;display:flex;align-items:center;gap:12px;min-width:0}
+.intro-bottom p{flex:1;min-width:0}
+.theme-dock{position:relative;isolation:isolate;flex:0 0 auto;width:44px;height:54px;transition:width .24s var(--spring);touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.theme-dock.is-open{width:154px}
+.theme-dock>[data-action=theme]{position:absolute;right:0;top:5px;z-index:2}
+.theme-dock.is-dragging{transition:none}
+.theme-dock.is-dragging .glass-theme{animation:none}
+.theme-dock>.glass-thumb{border-radius:50%;z-index:3}
 .summary-card{margin:20px 0;padding:18px;border-radius:24px}
 .summary-card .eyebrow{font-size:11px;letter-spacing:.9px}
 .summary-heading{font-size:19px;font-weight:600;letter-spacing:-.35px;line-height:1.25;margin:7px 0 16px;text-transform:capitalize}
@@ -123,7 +132,10 @@ button,input,select,textarea{font-family:inherit}
 .week-day .dow{text-transform:none;font-size:12px;letter-spacing:0}.week-day .date{font-size:22px;line-height:1.1;font-weight:500;letter-spacing:-.6px}
 .week-day:last-of-type .dow,.week-day:last-of-type .date{color:var(--offday)}
 .week-strip .glass-thumb{border-radius:16px}
-.week-day.today:after{background:var(--control-focus)}
+.week-day.today::after{content:none}
+.week-day .dow{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.today-marker{position:absolute;left:calc(100% + 3px);top:calc(50% - 2px);width:4px;height:4px;border-radius:50%;background:var(--control-focus)}
+.week-day .dots{min-height:4px;height:4px;flex-shrink:0}
 .day-grid{grid-template-columns:minmax(0,1fr);gap:20px}
 .day-aside{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .day-aside .aside-card{margin:0;padding:18px}
@@ -250,6 +262,8 @@ dialog::backdrop{background:rgba(67,45,75,.12);backdrop-filter:blur(4px);-webkit
 .glass-theme{display:flex;gap:3px;border-radius:28px;padding:4px;width:max-content;animation:theme-slide-left .2s var(--spring) both;transform-origin:right center;isolation:isolate;touch-action:pan-y}
 .glass-theme button{width:44px;height:44px;min-height:44px;display:grid;place-items:center;border-radius:50%;background:transparent;color:var(--text);position:relative;z-index:1}
 .glass-theme svg{width:20px;height:20px}
+.theme-dock .glass-theme{position:absolute;top:0;right:53px;left:auto;bottom:auto;width:101px;max-width:none;max-height:none;overflow:visible;animation:theme-dock-open .24s var(--spring) both}
+.theme-dock.is-dragging .glass-theme{animation:none}
 .toast{background:var(--overlay-fill);color:var(--text);border:1px solid var(--overlay-edge);box-shadow:var(--liquid-shadow);backdrop-filter:blur(24px);border-radius:22px;font-size:13px;line-height:1.5;transition:opacity .2s,transform .3s var(--spring);bottom:calc(22px + env(safe-area-inset-bottom))}
 .profile-stat{border-radius:18px}.profile-stat strong{font-size:26px;font-weight:550}.history-row{font-size:13px}.history-row small{font-size:12px}.profile-bars{gap:8px}
 .export-options .btn{border-radius:18px;padding:15px;min-height:60px}.export-options small{font-size:12px;line-height:1.5}
@@ -259,6 +273,7 @@ dialog::backdrop{background:rgba(67,45,75,.12);backdrop-filter:blur(4px);-webkit
 @keyframes glass-sheet-in{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes glass-menu-in{from{opacity:0;transform:translateY(-5px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes theme-slide-left{from{opacity:0;transform:translateX(7px) scale(.97)}to{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes theme-dock-open{from{opacity:0;clip-path:inset(-12px -12px -12px 100%);transform:translateX(7px)}to{opacity:1;clip-path:inset(-48px);transform:translateX(0)}}
 @keyframes launch-header{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes launch-mark{from{transform:scale(.92)}to{transform:scale(1)}}
 body.launch-motion .topbar{animation:launch-header .45s var(--spring) both}
