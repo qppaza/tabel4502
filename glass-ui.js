@@ -7,7 +7,7 @@ const pad=n=>String(n).padStart(2,'0');
 const monthAt=(year,index)=>`${String(year).padStart(4,'0')}-${pad(index+1)}`;
 const monthNames=Array.from({length:12},(_,m)=>new Date(Date.UTC(2026,m,1)).toLocaleDateString('ru-RU',{month:'long',timeZone:'UTC'}));
 const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
-let active=null,controlCount=0;
+let active=null,controlCount=0,ignorePointerClickUntil=0;
 const rails=new Map(),railLayouts=new WeakMap();
 
 export function closeGlassPopover(focus=true){
@@ -56,7 +56,7 @@ function openCalendar(input,anchor){
   const initial=input.value||(monthOnly?today().slice(0,7):today());
   let year=Number(initial.slice(0,4)),month=Number(initial.slice(5,7))-1;
   let mode=monthOnly?'months':'days';
-  let focusDate=monthOnly?`${initial}-01`:initial;
+  let focusDate=monthOnly?`${initial}-01`:initial,choiceTimer=0;
   const panel=createPanel(anchor,'glass-calendar',monthOnly?'Выбрать месяц табеля':'Выбрать дату');
   const allowed=v=>(!input.min||v>=input.min)&&(!input.max||v<=input.max);
   const select=v=>{if(allowed(v))commitInput(input,v);};
@@ -73,17 +73,28 @@ function openCalendar(input,anchor){
     }
     panel.innerHTML=`<div class="calendar-nav"><button type="button" class="icon-btn" data-cal-prev aria-label="${mode==='days'?'Предыдущий месяц':mode==='months'?'Предыдущий год':'Предыдущие годы'}">${I.left}</button><button type="button" class="calendar-heading" data-cal-heading aria-label="${mode==='days'?'Выбрать месяц и год':'Выбрать год'}">${heading}</button><button type="button" class="icon-btn" data-cal-next aria-label="${mode==='days'?'Следующий месяц':mode==='months'?'Следующий год':'Следующие годы'}">${I.right}</button></div>${grid}<p class="calendar-note">${monthOnly?'Выберите месяц для табеля':'Розовым отмечены воскресенья'}</p><div class="calendar-footer"><button type="button" data-cal-today>${monthOnly?'Этот месяц':'Сегодня'}</button><button type="button" data-cal-close>Закрыть</button></div>`;
     placePanel();
+    mountRail(panel.querySelector('.calendar-grid'),'button','calendar',{axis:'both',remember:false});
   }
   function shift(dir){
     if(mode==='days'){month+=dir;if(month<0){month=11;year--;}if(month>11){month=0;year++;}}
     else year+=dir*(mode==='years'?12:1);
     year=Math.max(1,Math.min(year,9999));draw();
   }
+  function activateCell(b){
+    clearTimeout(choiceTimer);
+    railLayouts.get(b.closest('.calendar-grid'))?.preview(b);
+    choiceTimer=setTimeout(()=>{
+      if(active?.panel!==panel||!b.isConnected)return;
+      if(b.hasAttribute('data-date-value'))select(b.dataset.dateValue);
+      else if(b.hasAttribute('data-month-value')){month=Number(b.dataset.monthValue);if(monthOnly)select(monthAt(year,month));else{mode='days';draw();focusFirst(panel);}}
+      else if(b.hasAttribute('data-year-value')){year=Number(b.dataset.yearValue);mode='months';draw();focusFirst(panel);}
+    },reduced()?0:150);
+  }
+  panel.addEventListener('pointerdown',()=>clearTimeout(choiceTimer));
   panel.addEventListener('click',e=>{
     const b=e.target.closest('button');if(!b||b.disabled)return;
-    if(b.hasAttribute('data-date-value'))select(b.dataset.dateValue);
-    else if(b.hasAttribute('data-month-value')){month=Number(b.dataset.monthValue);if(monthOnly)select(monthAt(year,month));else{mode='days';draw();focusFirst(panel);}}
-    else if(b.hasAttribute('data-year-value')){year=Number(b.dataset.yearValue);mode='months';draw();focusFirst(panel);}
+    clearTimeout(choiceTimer);
+    if(b.closest('.calendar-grid'))activateCell(b);
     else if(b.hasAttribute('data-cal-prev')||b.hasAttribute('data-cal-next')){const prev=b.hasAttribute('data-cal-prev');shift(prev?-1:1);panel.querySelector(prev?'[data-cal-prev]':'[data-cal-next]')?.focus({preventScroll:true});}
     else if(b.hasAttribute('data-cal-heading')){mode=mode==='days'?'months':mode==='months'?'years':'months';draw();focusFirst(panel);}
     else if(b.hasAttribute('data-cal-today'))select(monthOnly?today().slice(0,7):today());
@@ -97,9 +108,10 @@ function openCalendar(input,anchor){
       e.preventDefault();
       if(mode==='days'){
         focusDate=addDays(b.dataset.dateValue,delta);year=Number(focusDate.slice(0,4));month=Number(focusDate.slice(5,7))-1;
-        draw();panel.querySelector(`[data-date-value="${focusDate}"]`)?.focus({preventScroll:true});
+        if(year!==Number(b.dataset.dateValue.slice(0,4))||month!==Number(b.dataset.dateValue.slice(5,7))-1)draw();
+        const target=panel.querySelector(`[data-date-value="${focusDate}"]`);target?.focus({preventScroll:true});railLayouts.get(target?.closest('.calendar-grid'))?.preview(target);
       }else{
-        const buttons=[...panel.querySelectorAll('.calendar-grid button')],i=buttons.indexOf(b),next=Math.max(0,Math.min(buttons.length-1,i+delta));buttons[next]?.focus({preventScroll:true});
+        const buttons=[...panel.querySelectorAll('.calendar-grid button:not(:disabled)')],i=buttons.indexOf(b),next=Math.max(0,Math.min(buttons.length-1,i+delta));buttons[next]?.focus({preventScroll:true});railLayouts.get(buttons[next]?.closest('.calendar-grid'))?.preview(buttons[next]);
       }
     }else if(e.key==='PageUp'||e.key==='PageDown'){e.preventDefault();shift(e.key==='PageUp'?-1:1);focusFirst(panel);}
   });
@@ -149,17 +161,21 @@ function enhanceNumber(input){
     if(delta<0)wrapper.prepend(b);else wrapper.append(b);
   }
   if(input.dataset.hours){
+    const slider=document.createElement('div');slider.className='hours-slider';
+    slider.innerHTML='<span class="hours-slider-track" aria-hidden="true"><span></span></span><span class="hours-slider-thumb" aria-hidden="true"></span>';
     const range=document.createElement('input');range.type='range';range.min=input.min||'0';range.max=input.max||'24';range.step=input.step||'1';range.className='hours-range';range.dataset.rangeFor=input.id;
     range.setAttribute('aria-label',`${label}: ползунок`);
     range.addEventListener('input',()=>{input.value=range.value;input.dispatchEvent(new Event('input',{bubbles:true}));});
-    wrapper.after(range);
+    range.addEventListener('pointerdown',e=>{if(!e.isPrimary||e.button!==0)return;slider.classList.add('is-sliding');range.setPointerCapture(e.pointerId);});
+    for(const event of ['pointerup','pointercancel','lostpointercapture','blur'])range.addEventListener(event,()=>slider.classList.remove('is-sliding'));
+    slider.append(range);wrapper.after(slider);
   }
 }
 function syncNumbers(){
   document.querySelectorAll('.number-stepper input').forEach(input=>{
     const w=input.parentElement,buttons=w.querySelectorAll('button'),value=Number(input.value)||0;
     buttons[0].disabled=value<=Number(input.min||0);buttons[1].disabled=input.max!==''&&value>=Number(input.max);
-    const range=w.parentElement.querySelector('.hours-range');if(range){range.value=String(value);range.style.setProperty('--range-fill',`${100*value/Number(range.max)}%`);w.parentElement.classList.toggle('has-hours',value>0);}
+    const range=w.parentElement.querySelector('.hours-range');if(range){range.value=String(value);const fill=100*(Number(range.value)-Number(range.min))/(Number(range.max)-Number(range.min));range.parentElement.style.setProperty('--range-fill',`${fill}%`);range.parentElement.style.setProperty('--range-ratio',String(fill/100));w.parentElement.classList.toggle('has-hours',value>0);}
   });
 }
 export function openThemeMenu(anchor,value,onChange){
@@ -168,29 +184,68 @@ export function openThemeMenu(anchor,value,onChange){
   const names={light:'Светлая тема',dark:'Тёмная тема',system:'Как в системе'};
   p.innerHTML=['light','dark','system'].filter(t=>t!==value).map(t=>`<button type="button" data-theme-choice="${t}" aria-label="${names[t]}" title="${names[t]}">${I[t]}</button>`).join('');
   p.addEventListener('click',e=>{const b=e.target.closest('[data-theme-choice]');if(!b)return;closeGlassPopover(false);onChange(b.dataset.themeChoice);requestAnimationFrame(()=>document.querySelector('[data-action=theme]')?.focus({preventScroll:true}));});
-  placePanel();focusFirst(p);
+  placePanel();mountRail(p,'button','theme-menu',{remember:false});focusFirst(p);
 }
-function mountRail(container,selector,key){
-  if(!container)return;if(container.dataset.glassRail){railLayouts.get(container)?.();return;}container.dataset.glassRail='yes';
-  const buttons=[...container.querySelectorAll(selector)];
-  const selected=buttons.find(b=>b.matches('[aria-pressed=true],.selected'));
+function mountRail(container,selector,key,{axis='x',remember=true}={}){
+  if(!container)return;if(container.dataset.glassRail){railLayouts.get(container)?.reflow();return;}container.dataset.glassRail='yes';
+  const buttons=[...container.querySelectorAll(selector)].filter(b=>!b.disabled);
+  if(!buttons.length)return;
+  const selected=()=>buttons.find(b=>b.matches('[aria-pressed=true],.selected'));
   const thumb=document.createElement('span');thumb.className='glass-thumb';thumb.setAttribute('aria-hidden','true');container.prepend(thumb);
   const bounds=b=>{const c=container.getBoundingClientRect(),r=b.getBoundingClientRect();return{x:r.left-c.left-container.clientLeft,y:r.top-c.top-container.clientTop,w:r.width,h:r.height};};
-  const move=(r,remember=false)=>{thumb.style.width=`${r.w}px`;thumb.style.height=`${r.h}px`;thumb.style.transform=`translate(${r.x}px,${r.y}px)`;thumb.style.opacity='1';if(remember)rails.set(key,r);};
-  if(selected){const target=bounds(selected),previous=rails.get(key);if(previous&&!reduced()){move({...target,x:previous.x});requestAnimationFrame(()=>{if(container.isConnected)move(target,true);});}else move(target,true);}else thumb.style.opacity='0';
-  railLayouts.set(container,()=>{if(selected)move(bounds(selected),true);});
-  let drag=null,suppress=false;
-  const closest=x=>buttons.reduce((best,b)=>{const r=b.getBoundingClientRect(),distance=Math.abs(x-r.left-r.width/2);return !best||distance<best.distance?{button:b,distance}:best;},null)?.button;
-  container.addEventListener('pointerdown',e=>{if(e.button!==0||!e.target.closest('button'))return;drag={x:e.clientX,y:e.clientY,id:e.pointerId,moved:false};});
+  let drag=null,position=null;
+  const move=(r,save=false)=>{position=r;thumb.style.width=`${r.w}px`;thumb.style.height=`${r.h}px`;thumb.style.transform=`translate3d(${r.x}px,${r.y}px,0)`;thumb.style.opacity='1';if(save&&remember)rails.set(key,r);};
+  const highlight=b=>{container.classList.toggle('has-preview',!!b);buttons.forEach(x=>x.classList.toggle('is-preview',x===b));};
+  const reset=()=>{container.classList.remove('is-dragging');highlight(null);const b=selected();if(b)move(bounds(b),true);else thumb.style.opacity='0';};
+  const initial=selected();
+  if(initial){const target=bounds(initial),previous=remember&&rails.get(key);if(previous&&!reduced()){move({...target,x:previous.x,y:previous.y});thumb.getBoundingClientRect();requestAnimationFrame(()=>{if(container.isConnected&&!drag)move(target,true);});}else move(target,true);}else thumb.style.opacity='0';
+  railLayouts.set(container,{reflow:()=>{if(!drag)reset();},preview:b=>{if(b){highlight(b);move(bounds(b));}}});
+  function hit(x,y){
+    const rect=container.getBoundingClientRect();
+    if(axis==='both'&&(x<rect.left||x>rect.right||y<rect.top||y>rect.bottom))return null;
+    let best=null,distance=Infinity;
+    for(const button of buttons){const r=button.getBoundingClientRect(),d=axis==='both'?Math.hypot(x-r.left-r.width/2,y-r.top-r.height/2):Math.abs(x-r.left-r.width/2);if(d<distance&&(axis!=='both'||d<=Math.max(r.width,r.height)*.75)){best=button;distance=d;}}
+    return best;
+  }
+  function follow(e){
+    const target=hit(e.clientX,e.clientY),c=container.getBoundingClientRect();drag.target=target;highlight(target);
+    const cells=buttons.map(bounds),size=drag.size;
+    const minX=Math.min(...cells.map(r=>r.x)),maxX=Math.max(...cells.map(r=>r.x+r.w))-size.w;
+    const minY=Math.min(...cells.map(r=>r.y)),maxY=Math.max(...cells.map(r=>r.y+r.h))-size.h;
+    move({w:size.w,h:size.h,x:Math.max(minX,Math.min(maxX,e.clientX-c.left-container.clientLeft-size.w/2)),y:axis==='both'?Math.max(minY,Math.min(maxY,e.clientY-c.top-container.clientTop-size.h/2)):size.y});
+    if(axis==='both'&&!target)thumb.style.opacity='.25';
+  }
+  container.addEventListener('pointerdown',e=>{
+    if(!e.isPrimary||e.button!==0)return;
+    const b=e.target.closest(selector);if(!b||!buttons.includes(b))return;
+    highlight(null);drag={x:e.clientX,y:e.clientY,id:e.pointerId,moved:false,size:bounds(b),target:b};
+  });
   container.addEventListener('pointermove',e=>{
     if(!drag||e.pointerId!==drag.id)return;
-    if(!drag.moved&&Math.abs(e.clientY-drag.y)>Math.abs(e.clientX-drag.x)&&Math.abs(e.clientY-drag.y)>8){drag=null;return;}
-    if(Math.abs(e.clientX-drag.x)>7){drag.moved=true;container.classList.add('is-dragging');if(!container.hasPointerCapture(e.pointerId))container.setPointerCapture(e.pointerId);const b=closest(e.clientX);if(b)move(bounds(b));}
+    const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+    if(!drag.moved){
+      if(axis==='x'&&Math.abs(dy)>Math.abs(dx)&&Math.abs(dy)>8){drag=null;reset();return;}
+      if((axis==='both'?Math.hypot(dx,dy):Math.abs(dx))<5)return;
+      drag.moved=true;container.classList.add('is-dragging');container.setPointerCapture(e.pointerId);
+    }
+    e.preventDefault();follow(e);
   });
-  container.addEventListener('pointerup',e=>{if(!drag)return;const moved=drag.moved;drag=null;container.classList.remove('is-dragging');if(moved){e.preventDefault();suppress=true;const b=closest(e.clientX);b?.click();setTimeout(()=>suppress=false,300);}});
-  container.addEventListener('pointercancel',()=>{drag=null;container.classList.remove('is-dragging');if(selected)move(bounds(selected));});
-  container.addEventListener('click',e=>{if(suppress&&e.isTrusted){e.preventDefault();e.stopImmediatePropagation();}},{capture:true});
-  container.addEventListener('keydown',e=>{const i=buttons.indexOf(e.target);if(i<0)return;const d=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0;if(!d)return;e.preventDefault();const b=buttons[Math.max(0,Math.min(buttons.length-1,i+d))];b.click();requestAnimationFrame(()=>{const now=document.querySelector(`[data-rail-key="${key}"]`);now?.querySelector('[aria-pressed=true],.selected')?.focus({preventScroll:true});});});
+  function finish(e,cancel=false){
+    if(!drag||e.pointerId!==drag.id)return;
+    if(drag.moved&&!cancel)follow(e);
+    const ended=drag;drag=null;
+    if(container.hasPointerCapture(e.pointerId))container.releasePointerCapture(e.pointerId);
+    container.classList.remove('is-dragging');
+    if(!ended.moved)return;
+    e.preventDefault();ignorePointerClickUntil=Date.now()+450;
+    if(cancel||!ended.target){reset();return;}
+    if(remember&&position)rails.set(key,position);
+    highlight(ended.target);move(bounds(ended.target));ended.target.click();
+  }
+  container.addEventListener('pointerup',e=>finish(e));
+  container.addEventListener('pointercancel',e=>finish(e,true));
+  container.addEventListener('lostpointercapture',e=>{if(e.target===container)finish(e,true);});
+  if(axis==='x')container.addEventListener('keydown',e=>{const i=buttons.indexOf(e.target);if(i<0)return;const d=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0;if(!d)return;e.preventDefault();const b=buttons[Math.max(0,Math.min(buttons.length-1,i+d))];b.click();requestAnimationFrame(()=>{const now=document.querySelector(`[data-rail-key="${key}"]`);now?.querySelector('[aria-pressed=true],.selected')?.focus({preventScroll:true});});});
   container.dataset.railKey=key;
 }
 export function mountGlassUI(root=document){
@@ -203,7 +258,8 @@ export function mountGlassUI(root=document){
   syncNumbers();
 }
 document.addEventListener('input',()=>requestAnimationFrame(syncNumbers));
-document.addEventListener('pointerdown',e=>{if(active&&!active.panel.contains(e.target)&&!active.anchor.contains(e.target))closeGlassPopover(false);},{capture:true});
+document.addEventListener('pointerdown',e=>{ignorePointerClickUntil=0;if(active&&!active.panel.contains(e.target)&&!active.anchor.contains(e.target))closeGlassPopover(false);},{capture:true});
+document.addEventListener('click',e=>{if(e.isTrusted&&e.detail>0&&Date.now()<ignorePointerClickUntil){e.preventDefault();e.stopImmediatePropagation();ignorePointerClickUntil=0;}},{capture:true});
 document.addEventListener('keydown',e=>{
   if(!active)return;
   if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeGlassPopover();return;}
