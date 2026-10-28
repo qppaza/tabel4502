@@ -8,7 +8,7 @@ const monthAt=(year,index)=>`${String(year).padStart(4,'0')}-${pad(index+1)}`;
 const monthNames=Array.from({length:12},(_,m)=>new Date(Date.UTC(2026,m,1)).toLocaleDateString('ru-RU',{month:'long',timeZone:'UTC'}));
 const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 let active=null,controlCount=0,ignorePointerClickUntil=0;
-const rails=new Map(),railLayouts=new WeakMap();
+const rails=new Map(),railLayouts=new WeakMap(),dateControls=new WeakMap();
 
 export function closeGlassPopover(focus=true){
   if(!active)return;
@@ -127,13 +127,13 @@ function openCalendar(input,anchor){
   draw();focusFirst(panel);
 }
 function enhanceDate(input){
-  if(input.dataset.glassReady)return;input.dataset.glassReady='yes';
+  if(input.dataset.glassReady){dateControls.get(input)?.();return;}input.dataset.glassReady='yes';
   input.classList.add('glass-native');input.tabIndex=-1;input.setAttribute('aria-hidden','true');
   const b=document.createElement('button');b.type='button';b.className='glass-control';b.dataset.controlFor=input.id;
   b.setAttribute('aria-haspopup','dialog');b.setAttribute('aria-expanded','false');
   const update=()=>{const value=input.value,text=value?(input.type==='month'?monthLabel(value):ruDate(value,{day:'numeric',month:'short',year:'numeric'})):'Выбрать дату';b.innerHTML=`${I.calendar}<span>${esc(text)}</span>${I.down}`;b.setAttribute('aria-label',`${input.getAttribute('aria-label')||'Выбрать дату'}: ${text}`);};
   b.addEventListener('click',()=>{if(active?.anchor===b)closeGlassPopover();else openCalendar(input,b);});
-  input.addEventListener('change',update);input.after(b);update();
+  dateControls.set(input,update);input.addEventListener('change',update);input.after(b);update();
 }
 function enhanceSelect(select){
   if(select.dataset.glassReady)return;select.dataset.glassReady='yes';

@@ -30,6 +30,7 @@
   --overlay-edge:rgba(246,233,255,.25);--solid:#302b35;--control-ink:#eee5ef;--control-focus:#d9bedc;--offday:#f0a5af;
   color-scheme:dark;
 }
+html{overflow-anchor:none}
 body{font-size:14px;line-height:1.5;min-height:100vh;min-width:0}
 body>.ambient{background:radial-gradient(ellipse at 6% 16%,#dac9ed88,transparent 51%),radial-gradient(ellipse at 94% 2%,#f0d7c96e,transparent 49%),radial-gradient(ellipse at 87% 83%,#c3e4da80,transparent 50%),radial-gradient(ellipse at 15% 95%,#d2dcf04a,transparent 48%),var(--bg)}
 [data-theme=dark] body>.ambient{background:radial-gradient(ellipse at 0% 25%,#75628438,transparent 50%),radial-gradient(ellipse at 95% 4%,#a8857240,transparent 45%),radial-gradient(ellipse at 74% 92%,#537c6e33,transparent 48%),#15151b}
@@ -68,11 +69,11 @@ button,input,select,textarea{font-family:inherit}
 .group-symbol svg{width:15px;height:15px}
 .workspace{grid-template-columns:320px minmax(0,1fr);gap:32px;padding:28px 0 24px}
 .sidebar{display:block;position:sticky;top:24px;align-self:start;min-height:0;padding:0}
-.intro{position:relative;min-height:104px;padding:0;display:grid;grid-template-columns:minmax(0,1fr) 44px;column-gap:16px;row-gap:8px}
+.intro{position:relative;min-height:104px;padding:0;display:grid;grid-template-columns:minmax(0,1fr) 44px;column-gap:16px;row-gap:3px}
 .intro h1{font-size:32px;line-height:1.15;letter-spacing:-1.1px;margin:10px 0 8px;font-weight:650}
 .intro p{font-size:13px;line-height:1.5;color:var(--muted)}
 .intro .eyebrow{font-size:11px;line-height:1.5;letter-spacing:.65px}
-.intro .intro-heading h1{margin-bottom:0}
+.intro .intro-heading h1{margin:14px 0 0;line-height:1.2}
 .intro-help{align-self:start;justify-self:end}
 .intro-bottom{grid-column:1/-1;display:flex;align-items:center;gap:12px;min-width:0}
 .intro-bottom p{flex:1;min-width:0}
@@ -99,7 +100,7 @@ button,input,select,textarea{font-family:inherit}
 .side-bottom{display:block;margin:20px 0 0;padding:0;font-size:12px}
 .main-toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:0 0 18px}
 .view-tabs{display:flex;position:relative;isolation:isolate;align-items:center;border-radius:28px;padding:4px;width:228px;min-width:170px;flex:0 1 228px;touch-action:pan-y;user-select:none}
-.view-tabs button{position:relative;z-index:1;flex:1;min-height:38px;background:transparent;font-size:14px;color:var(--muted);border-radius:24px;padding:0 14px}
+.view-tabs button{position:relative;z-index:1;flex:1;display:grid;place-items:center;height:38px;min-height:38px;line-height:1;background:transparent;font-size:14px;color:var(--muted);border-radius:24px;padding:0 14px}
 .view-tabs button[aria-pressed=true]{color:var(--text);font-weight:600}
 .toolbar-links{display:flex;gap:6px}
 .toolbar-links .active{background:var(--liquid-selected);border-color:var(--liquid-selected-edge);box-shadow:var(--liquid-selected-shadow);color:var(--text)}
@@ -136,7 +137,7 @@ button,input,select,textarea{font-family:inherit}
 .week-day .dow{position:relative;display:inline-flex;align-items:center;justify-content:center}
 .today-marker{position:absolute;left:calc(100% + 3px);top:calc(50% - 2px);width:4px;height:4px;border-radius:50%;background:var(--control-focus)}
 .week-day .dots{min-height:4px;height:4px;flex-shrink:0}
-.day-grid{grid-template-columns:minmax(0,1fr);gap:20px}
+.day-grid{grid-template-columns:minmax(0,1fr);gap:20px;overflow-anchor:none}
 .day-aside{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .day-aside .aside-card{margin:0;padding:18px}
 .day-aside .legend{grid-template-columns:1fr;gap:10px}
@@ -268,6 +269,13 @@ dialog::backdrop{background:rgba(67,45,75,.12);backdrop-filter:blur(4px);-webkit
 .profile-stat{border-radius:18px}.profile-stat strong{font-size:26px;font-weight:550}.history-row{font-size:13px}.history-row small{font-size:12px}.profile-bars{gap:8px}
 .export-options .btn{border-radius:18px;padding:15px;min-height:60px}.export-options small{font-size:12px;line-height:1.5}
 .form-error{font-size:13px}
+.footer{flex-wrap:wrap;gap:12px 24px}
+.footer-copy{min-width:0;line-height:1.6}
+.footer-copy>span+span{margin-top:5px}
+.footer-links{display:flex;align-items:center;gap:6px 20px;flex-wrap:wrap}
+.footer-links a{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:12px;color:var(--muted);white-space:nowrap}
+.footer-links a:hover{color:var(--text)}
+.footer-links svg{width:14px;height:14px}
 *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 28%,transparent) transparent}
 ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{border-radius:20px;background:color-mix(in srgb,var(--muted) 28%,transparent);border:2px solid transparent;background-clip:padding-box}
 @keyframes glass-sheet-in{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -316,6 +324,10 @@ body.launch-motion .academy-mark{animation:launch-mark .65s var(--spring) both}
  .day-calendar .date-controls .glass-control>svg:first-child{display:block}
  .day-calendar .date-controls .btn{justify-self:end}
 }
+/* Fixed day geometry and a retained rail avoid vertical movement on selection. */
+.day-calendar .week-day{display:grid;grid-template-rows:18px 24px 4px;align-content:center;justify-items:center;gap:7px;height:80px;min-height:80px;padding:9px 0;transform:none;transition:color .2s}
+.day-calendar .week-day .dow{line-height:18px}
+.day-calendar .week-day .date{line-height:24px}
 @supports not (backdrop-filter:blur(1px)){.glass-popover,dialog,.toast{background:var(--liquid-solid)}}
 @media(prefers-reduced-transparency:reduce){.glass-popover,dialog,.toast,.glass,.lesson-card{background:var(--liquid-solid);backdrop-filter:none;-webkit-backdrop-filter:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}

@@ -1,10 +1,10 @@
 import {parseEntry,REASONS,CODES,TYPES,emptyTotals,esc,uid,today,dateObj,addDays,monday,monthDays,monthLabel,ruDate,fmt,sum,compact,makeGroup,newState,lessonsFor,dayTotals,monthTotals,groupTotals,monthStudents,statusFor,validSchedule,validateState,printHTML} from './core.js';
-import {mountGlassUI,closeGlassPopover,openThemeMenu} from './glass-ui.js?v=4';
+import {mountGlassUI,closeGlassPopover,openThemeMenu} from './glass-ui.js?v=5';
 const $=s=>document.querySelector(s), KEY='tabel-v1', SCHEDULE_KEY='tabel-schedule-v1';
 const paths={calendar:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18m-13 5h2m4 0h2"/>',table:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 3v18m6-12v12M3 15h18"/>',users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/><circle cx="9" cy="7" r="4"/>',settings:'<path d="M4 7h16M4 17h16M8 4v6m8 4v6"/>',check:'<path d="m5 12 4 4L19 6"/>',chevron:'<path d="m9 5 7 7-7 7"/>',left:'<path d="m15 5-7 7 7 7"/>',plus:'<path d="M12 5v14M5 12h14"/>',x:'<path d="m6 6 12 12M6 18 18 6"/>',download:'<path d="M12 3v12m-5-5 5 5 5-5M5 15v5h14v-5"/>',print:'<path d="M6 9V3h12v6M6 18H3v-8h18v8h-3M6 14h12v7H6zm11-2h1"/>',search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',moon:'<path d="M21 12.8A9 9 0 0 1 11.2 3 9 9 0 1 0 21 12.8Z"/>',system:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',arrow:'<path d="M7 17 17 7M7 7h10v10"/>',shield:'<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8 12 3 3 5-6"/>',undo:'<path d="M3 10h11a7 7 0 0 1 0 14M3 10l5-5m-5 5 5 5" transform="translate(0 -3)"/>',refresh:'<path d="M20 7v5h-5M4 17v-5h5M6.1 6.1a8 8 0 0 1 13.3 3M4.6 14.9a8 8 0 0 0 13.3 3"/>',file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8m-8 4h5"/>',edit:'<path d="m16 3 5 5-12 12-6 1 1-6zM13 6l5 5"/>',info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',archive:'<path d="M3 3h18v5H3zm2 5v13h14V8m-10 4h6"/>',upload:'<path d="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6"/>'};
 const icon=(name,cls='')=>`<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.file}</svg>`;
 let state=newState(),schedule=null,storageError='',rawBroken=null,scheduleUpdated='2026-10-26',savedTime='',undoStack=[],demo=false,realState=null;
-let view='month',selectedDate=today(),month=selectedDate.slice(0,7),selectedLesson=null,query='',selectedStudents=new Set(),refreshing=false;
+let view='day',selectedDate=today(),month=selectedDate.slice(0,7),selectedLesson=null,query='',selectedStudents=new Set(),refreshing=false;
 try{const raw=localStorage.getItem(KEY);if(raw){try{state=validateState(JSON.parse(raw));savedTime=state.updatedAt||'';}catch{rawBroken=raw;storageError='Сохранённый журнал не удалось прочитать. Исходные данные сохранены: скачайте их в настройках перед восстановлением.';}}}catch{storageError='Браузер не разрешает сохранять данные. Скачайте резервную копию перед закрытием страницы.';}
 try{const cached=JSON.parse(localStorage.getItem(SCHEDULE_KEY)||'null');if(validSchedule(cached?.data)){schedule=cached.data;scheduleUpdated=cached.updated;}}catch{}
 try{if(!schedule){const r=await fetch('./schedule.json');if(!r.ok)throw Error();schedule=await r.json();if(!validSchedule(schedule))throw Error();}}catch{schedule={weekDates:[],groups:[],days:[]};storageError+=' Расписание не загрузилось. Можно добавить занятия вручную или импортировать расписание в настройках.';}
@@ -17,7 +17,43 @@ function toast(s){const t=$('#toast');t.textContent=s;t.classList.add('show');cl
 function modal(title,sub,body){const d=$('#modal');if(d.open)d.close();closeGlassPopover(false);d.innerHTML=`<div class="modal-handle" aria-hidden="true"></div><div class="modal-head"><div><h2>${title}</h2>${sub?`<p>${sub}</p>`:''}</div><button class="icon-btn" data-action="close" aria-label="Закрыть">${icon('x')}</button></div><div class="modal-body">${body}</div>`;d.showModal();mountGlassUI(d);}
 function closeModal(){closeGlassPopover(false);$('#modal').close();}
 function confirmModal(title,text,onConfirm,label='Продолжить'){modal(esc(title),'',`<p class="note" style="font-size:13px">${esc(text)}</p><div class="modal-foot"><button class="btn" data-action="close">Отмена</button><button class="btn primary" id="confirmAction">${esc(label)}</button></div>`);$('#confirmAction').onclick=()=>{closeModal();onConfirm();};}
-function setDate(d){if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return;selectedDate=d;month=d.slice(0,7);selectedLesson=null;query='';selectedStudents.clear();render();}
+function setDate(d){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return;
+  closeGlassPopover(false);
+  if(d===selectedDate)return;
+  selectedDate=d;month=d.slice(0,7);selectedLesson=null;query='';selectedStudents.clear();
+  if(view==='day'&&$('.day-calendar'))refreshDay();else render();
+}
+function refreshDay(){
+  // Keep the live calendar, its focus and its sliding selection in place.
+  const position={x:window.scrollX,y:window.scrollY};
+  ensureLesson();
+  const template=document.createElement('template');template.innerHTML=renderDay();
+  const next=template.content;
+  for(const selector of ['.page-head p','.date-header h2','.date-header p']){
+    const current=$(selector),replacement=next.querySelector(selector);
+    if(current&&replacement&&current.innerHTML!==replacement.innerHTML)current.innerHTML=replacement.innerHTML;
+  }
+  $('#dateInput').value=selectedDate;
+  const currentDays=[...document.querySelectorAll('.week-strip .week-day')];
+  next.querySelectorAll('.week-day').forEach((replacement,i)=>{
+    const button=currentDays[i];
+    for(const attr of [...button.attributes])if(!replacement.hasAttribute(attr.name))button.removeAttribute(attr.name);
+    for(const attr of replacement.attributes)button.setAttribute(attr.name,attr.value);
+    if(button.innerHTML!==replacement.innerHTML)button.innerHTML=replacement.innerHTML;
+  });
+  $('.day-grid').innerHTML=next.querySelector('.day-grid').innerHTML;
+  if($('.summary-heading').textContent!==monthLabel(month)){
+    const totals=groupTotals(group(),month),metrics=document.querySelectorAll('.summary-metric>strong');
+    $('.summary-heading').textContent=monthLabel(month);
+    metrics[0].innerHTML=`${fmt(sum(totals))}<small>ч</small>`;
+    metrics[1].innerHTML=`${fmt(totals.ПН)}<small>ч</small>`;
+    metrics[2].textContent=students().length;
+    metrics[3].textContent=monthStudents(group(),month).filter(s=>sum(monthTotals(group(),s.id,month))>0).length;
+  }
+  mountGlassUI();
+  if(window.scrollX!==position.x||window.scrollY!==position.y)window.scrollTo({left:position.x,top:position.y,behavior:'instant'});
+}
 function setMonth(m){if(!/^\d{4}-\d{2}$/.test(m))return;month=m;selectedDate=`${month}-${String(Math.min(Number(selectedDate.slice(-2)),monthDays(m).length)).padStart(2,'0')}`;render();}
 function ensureLesson(){const ls=lessons();if(!ls.some(l=>l.id===selectedLesson))selectedLesson=ls[0]?.id||null;}
 function saveLabel(){if(demo)return 'Демонстрационный журнал';if(storageError)return 'Сохранение требует внимания';return savedTime?`Сохранено в ${new Date(savedTime).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Minsk'})}`:'Автосохранение включено';}
@@ -74,7 +110,13 @@ function render(){
         ${view==='day'?renderDay():view==='month'?renderMonth():view==='students'?renderStudents():renderSettings()}
       </main>
     </div>
-    <footer class="footer"><span>Личный помощник старосты · для сверки с бумажным журналом</span><span>${icon('shield')}${demo?'Демонстрация':saveLabel()} · в этом браузере</span></footer>
+    <footer class="footer">
+      <div class="footer-copy"><span>Личный помощник старосты · для сверки с бумажным журналом</span><span>${icon('shield')}${demo?'Демонстрация':saveLabel()} · в этом браузере</span></div>
+      <nav class="footer-links" aria-label="Автор и связанные проекты">
+        <a href="https://t.me/evxnescencee" target="_blank" rel="noopener noreferrer">Автор · @evxnescencee ${icon('arrow')}</a>
+        <a href="https://qppaza.github.io/myschedule/" target="_blank" rel="noopener noreferrer">Расписание 4502 ${icon('arrow')}</a>
+      </nav>
+    </footer>
   </div>`;
   const scroll=document.querySelector('.table-scroll');
   if(scroll&&scrollPos?.month===month){scroll.scrollLeft=scrollPos.left;scroll.scrollTop=scrollPos.top;}
