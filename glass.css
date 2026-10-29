@@ -30,12 +30,12 @@
   --overlay-edge:rgba(246,233,255,.25);--solid:#302b35;--control-ink:#eee5ef;--control-focus:#d9bedc;--offday:#f0a5af;
   color-scheme:dark;
 }
-html{overflow-anchor:none}
+html{overflow-anchor:none;scrollbar-gutter:stable}
 body{font-size:14px;line-height:1.5;min-height:100vh;min-width:0}
 body>.ambient{background:radial-gradient(ellipse at 6% 16%,#dac9ed88,transparent 51%),radial-gradient(ellipse at 94% 2%,#f0d7c96e,transparent 49%),radial-gradient(ellipse at 87% 83%,#c3e4da80,transparent 50%),radial-gradient(ellipse at 15% 95%,#d2dcf04a,transparent 48%),var(--bg)}
 [data-theme=dark] body>.ambient{background:radial-gradient(ellipse at 0% 25%,#75628438,transparent 50%),radial-gradient(ellipse at 95% 4%,#a8857240,transparent 45%),radial-gradient(ellipse at 74% 92%,#537c6e33,transparent 48%),#15151b}
 button{min-height:44px;transition:background .2s,transform .25s var(--spring),box-shadow .25s,border-color .2s}
-button:active:not(:disabled){transform:scale(.95)}
+button:active:not(:disabled){transform:none}
 button:disabled{opacity:.28}
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--control-focus);outline-offset:3px}
 button,input,select,textarea{font-family:inherit}
@@ -77,7 +77,7 @@ button,input,select,textarea{font-family:inherit}
 .intro-help{align-self:start;justify-self:end}
 .intro-bottom{grid-column:1/-1;display:flex;align-items:center;gap:12px;min-width:0}
 .intro-bottom p{flex:1;min-width:0}
-.theme-dock{position:relative;isolation:isolate;flex:0 0 auto;width:44px;height:54px;transition:width .24s var(--spring);touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.theme-dock{position:relative;isolation:isolate;flex:0 0 auto;width:154px;height:54px;touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .theme-dock.is-open{width:154px}
 .theme-dock>[data-action=theme]{position:absolute;right:0;top:5px;z-index:2}
 .theme-dock.is-dragging{transition:none}
@@ -99,14 +99,17 @@ button,input,select,textarea{font-family:inherit}
 .project-link{display:inline-flex!important;padding:0 14px;min-height:42px;align-items:center;border-radius:23px;background:var(--liquid-fill);border:1px solid var(--liquid-edge);box-shadow:var(--liquid-shadow);color:var(--control-ink);font-weight:500}
 .side-bottom{display:block;margin:20px 0 0;padding:0;font-size:12px}
 .main-toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:0 0 18px}
-.view-tabs{display:flex;position:relative;isolation:isolate;align-items:center;border-radius:28px;padding:4px;width:228px;min-width:170px;flex:0 1 228px;touch-action:pan-y;user-select:none}
+.view-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));position:relative;isolation:isolate;align-items:center;border-radius:28px;padding:4px;width:228px;min-width:170px;flex:0 1 228px;touch-action:pan-y;user-select:none}
 .view-tabs button{position:relative;z-index:1;flex:1;display:grid;place-items:center;height:38px;min-height:38px;line-height:1;background:transparent;font-size:14px;color:var(--muted);border-radius:24px;padding:0 14px}
 .view-tabs button[aria-pressed=true]{color:var(--text);font-weight:600}
+.view-tabs button{min-width:0;width:100%}
+.view-content{min-height:max(580px,calc(100dvh - 160px))}
 .toolbar-links{display:flex;gap:6px}
 .toolbar-links .active{background:var(--liquid-selected);border-color:var(--liquid-selected-edge);box-shadow:var(--liquid-selected-shadow);color:var(--text)}
 .toolbar-links .btn{gap:7px;padding:0 13px}
 .toolbar-links .btn span{font-size:12px}
 .glass-thumb{position:absolute;left:0;top:0;pointer-events:none;z-index:0;border-radius:24px;background:var(--liquid-selected);border:1px solid var(--liquid-selected-edge);box-shadow:var(--liquid-selected-shadow);transition:transform .32s var(--slide),width .25s var(--slide),height .25s var(--slide),opacity .2s;will-change:transform}
+.glass-thumb:not(.is-ready){transition:none}
 .is-dragging{cursor:grabbing!important}.is-dragging .glass-thumb{transition:none}
 .view-tabs button:active,.week-day:active{transform:none!important}
 .page-head{gap:12px;align-items:center;margin:0 2px 18px}
@@ -247,7 +250,9 @@ dialog::backdrop{background:rgba(67,45,75,.12);backdrop-filter:blur(4px);-webkit
 [data-glass-rail].has-preview button.is-preview{color:var(--text);font-weight:600}
 .calendar-grid[data-glass-rail] button:hover{background:transparent}
 .view-tabs,.week-strip,.theme-options,.glass-theme{cursor:grab;-webkit-user-select:none;user-select:none}
-.theme-options{touch-action:pan-y}
+.theme-options{position:relative;isolation:isolate;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;padding:4px;border-radius:28px;touch-action:pan-y}
+.theme-options button{position:relative;z-index:1;min-width:0;padding:0 8px;background:transparent;border-color:transparent;box-shadow:none}
+.theme-options button.selected{background:transparent;border-color:transparent;box-shadow:none;color:var(--text)}
 .theme-options button:active,.glass-theme button:active{transform:none!important}
 .calendar-grid button[data-offday=true]{color:var(--offday)}
 .calendar-grid button[data-today=true]::after{content:"";position:absolute;bottom:3px;left:calc(50% - 2px);width:4px;height:4px;border-radius:50%;background:var(--control-focus)}
@@ -278,8 +283,8 @@ dialog::backdrop{background:rgba(67,45,75,.12);backdrop-filter:blur(4px);-webkit
 .footer-links svg{width:14px;height:14px}
 *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 28%,transparent) transparent}
 ::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{border-radius:20px;background:color-mix(in srgb,var(--muted) 28%,transparent);border:2px solid transparent;background-clip:padding-box}
-@keyframes glass-sheet-in{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes glass-menu-in{from{opacity:0;transform:translateY(-5px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes glass-sheet-in{from{opacity:0}to{opacity:1}}
+@keyframes glass-menu-in{from{opacity:0}to{opacity:1}}
 @keyframes theme-slide-left{from{opacity:0;transform:translateX(7px) scale(.97)}to{opacity:1;transform:translateX(0) scale(1)}}
 @keyframes theme-dock-open{from{opacity:0;clip-path:inset(-12px -12px -12px 100%);transform:translateX(7px)}to{opacity:1;clip-path:inset(-48px);transform:translateX(0)}}
 @keyframes launch-header{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
@@ -328,6 +333,29 @@ body.launch-motion .academy-mark{animation:launch-mark .65s var(--spring) both}
 .day-calendar .week-day{display:grid;grid-template-rows:18px 24px 4px;align-content:center;justify-items:center;gap:7px;height:80px;min-height:80px;padding:9px 0;transform:none;transition:color .2s}
 .day-calendar .week-day .dow{line-height:18px}
 .day-calendar .week-day .date{line-height:24px}
+/* Subject type and live progress use the palette of the linked timetable. */
+.lesson-scroll{align-items:stretch;scroll-behavior:auto}
+.lesson-card{display:flex;flex-direction:column;align-items:stretch;gap:9px;min-width:210px;padding:17px 18px 14px;overflow:hidden;transform:none!important;transition:background .2s,border-color .2s,box-shadow .2s}
+.lesson-card::before{content:"";position:absolute;left:0;top:18px;width:3px;height:24px;border-radius:0 3px 3px 0;background:var(--lesson-color)}
+.lesson-card.current::before{bottom:18px;height:auto}
+.lesson-card .lesson-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0;font-size:12px;font-variant-numeric:tabular-nums}
+.lesson-card .lesson-kind{align-self:flex-start;display:inline-flex;align-items:center;min-height:24px;padding:3px 8px;border-radius:8px;font-size:11px;line-height:1.4;color:color-mix(in srgb,var(--lesson-color) 48%,#171020);background:color-mix(in srgb,var(--lesson-color) 14%,transparent)}
+[data-theme=dark] .lesson-card .lesson-kind{color:var(--lesson-color)}
+.lesson-card h3{flex:1;min-height:42px;max-width:none;margin:0;font-size:15px;font-weight:600;line-height:1.4}
+.lesson-card .lesson-foot{margin:0;min-height:18px;font-size:11px;align-items:center}
+.lesson-choice{color:var(--text);font-size:10px}
+.lesson-card.selected{border-color:color-mix(in srgb,var(--lesson-color) 55%,var(--liquid-selected-edge));box-shadow:var(--liquid-selected-shadow)}
+.lesson-card.current{background:var(--liquid-selected)}
+.lesson-live{display:flex;flex-wrap:wrap;justify-content:space-between;align-content:end;align-items:baseline;gap:2px 6px;min-height:35px;font-size:11px;line-height:1.4;color:var(--muted)}
+.lesson-card.current .lesson-live{color:color-mix(in srgb,var(--lesson-color) 48%,#171020)}
+[data-theme=dark] .lesson-card.current .lesson-live{color:var(--lesson-color)}
+.lesson-card.current .lesson-state{font-weight:600}
+.lesson-card.current .lesson-state::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--lesson-color);margin-right:5px;vertical-align:1px}
+.lesson-card.past .lesson-state::before{content:"✓ ";font-size:10px}
+.lesson-progress{display:block;flex:none;height:4px;overflow:hidden;border-radius:8px;background:color-mix(in srgb,var(--lesson-color) 15%,transparent);opacity:0}
+.lesson-progress>span{display:block;height:100%;border-radius:inherit;background:var(--lesson-color);transition:width .6s ease}
+.lesson-card.current .lesson-progress{opacity:1}
+@media(max-width:360px){.lesson-card{min-width:205px;padding-inline:16px}.theme-options button{font-size:11px;gap:4px}.theme-options svg{width:14px;height:14px}}
 @supports not (backdrop-filter:blur(1px)){.glass-popover,dialog,.toast{background:var(--liquid-solid)}}
 @media(prefers-reduced-transparency:reduce){.glass-popover,dialog,.toast,.glass,.lesson-card{background:var(--liquid-solid);backdrop-filter:none;-webkit-backdrop-filter:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}

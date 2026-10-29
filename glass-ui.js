@@ -1,5 +1,5 @@
 // Presentation-only controls. Existing inputs and their events remain the source of truth.
-import {esc,today,monthDays,monthLabel,ruDate,dateObj,addDays} from './core.js';
+import {esc,today,monthDays,monthLabel,ruDate,dateObj,addDays} from './core.js?v=6';
 
 const svg=(path,cls='')=>`<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
 const I={left:svg('<path d="m15 6-6 6 6 6"/>'),right:svg('<path d="m9 6 6 6-6 6"/>'),down:svg('<path d="m8 10 4 4 4-4"/>','chevron-down'),calendar:svg('<rect x="4" y="5" width="16" height="16" rx="3"/><path d="M8 3v4m8-4v4M4 11h16"/>'),check:svg('<path d="m5 12 4 4L19 6"/>'),light:svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1"/>'),dark:svg('<path d="M21 12.8A9 9 0 0 1 11.2 3 9 9 0 1 0 21 12.8Z"/>'),system:svg('<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8m-4-3v3M12 4v14"/>')};
@@ -8,7 +8,8 @@ const monthAt=(year,index)=>`${String(year).padStart(4,'0')}-${pad(index+1)}`;
 const monthNames=Array.from({length:12},(_,m)=>new Date(Date.UTC(2026,m,1)).toLocaleDateString('ru-RU',{month:'long',timeZone:'UTC'}));
 const reduced=()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
 let active=null,controlCount=0,ignorePointerClickUntil=0;
-const rails=new Map(),railLayouts=new WeakMap(),dateControls=new WeakMap();
+const railLayouts=new WeakMap(),dateControls=new WeakMap(),observedRails=new Set();
+const railObserver=new ResizeObserver(entries=>entries.forEach(({target})=>railLayouts.get(target)?.reflow()));
 
 export function closeGlassPopover(focus=true){
   if(!active)return;
@@ -253,14 +254,20 @@ function mountRail(container,selector,key,{axis='x',remember=true}={}){
   const selected=()=>buttons.find(b=>b.matches('[aria-pressed=true],.selected'));
   const thumb=document.createElement('span');thumb.className='glass-thumb';thumb.setAttribute('aria-hidden','true');container.prepend(thumb);
   // Layout coordinates remain accurate while a popover's entrance transform runs.
-  const bounds=b=>({x:b.offsetLeft,y:b.offsetTop,w:b.offsetWidth,h:b.offsetHeight});
+  const bounds=b=>{
+    const outer=container.getBoundingClientRect(),cell=b.getBoundingClientRect(),style=getComputedStyle(container);
+    const scaleX=outer.width/parseFloat(style.width)||1,scaleY=outer.height/parseFloat(style.height)||1;
+    return {x:(cell.left-outer.left)/scaleX-container.clientLeft,y:(cell.top-outer.top)/scaleY-container.clientTop,w:cell.width/scaleX,h:cell.height/scaleY};
+  };
   let drag=null,position=null;
-  const move=(r,save=false)=>{position=r;thumb.style.width=`${r.w}px`;thumb.style.height=`${r.h}px`;thumb.style.transform=`translate3d(${r.x}px,${r.y}px,0)`;thumb.style.opacity='1';if(save&&remember)rails.set(key,r);};
+  const move=r=>{position=r;thumb.style.width=`${r.w}px`;thumb.style.height=`${r.h}px`;thumb.style.transform=`translate3d(${r.x}px,${r.y}px,0)`;thumb.style.opacity='1';};
   const highlight=b=>{container.classList.toggle('has-preview',!!b);buttons.forEach(x=>x.classList.toggle('is-preview',x===b));};
   const reset=()=>{container.classList.remove('is-dragging');highlight(null);const b=selected();if(b)move(bounds(b),true);else thumb.style.opacity='0';};
   const initial=selected();
-  if(initial){const target=bounds(initial),previous=remember&&rails.get(key);if(previous&&!reduced()){move({...target,x:previous.x,y:previous.y});thumb.getBoundingClientRect();requestAnimationFrame(()=>{if(container.isConnected&&!drag)move(target,true);});}else move(target,true);}else thumb.style.opacity='0';
+  if(initial)move(bounds(initial));else thumb.style.opacity='0';
+  requestAnimationFrame(()=>{if(container.isConnected)thumb.classList.add('is-ready');});
   railLayouts.set(container,{reflow:()=>{if(!drag)reset();},preview:b=>{if(b){highlight(b);move(bounds(b));}}});
+  observedRails.add(container);railObserver.observe(container);
   function hit(x,y){
     const rect=container.getBoundingClientRect();
     if(axis==='both'&&(x<rect.left||x>rect.right||y<rect.top||y>rect.bottom))return null;
@@ -301,7 +308,6 @@ function mountRail(container,selector,key,{axis='x',remember=true}={}){
     if(!ended.moved)return;
     e.preventDefault();ignorePointerClickUntil=Date.now()+450;
     if(cancel||!ended.target){reset();return;}
-    if(remember&&position)rails.set(key,position);
     highlight(ended.target);move(bounds(ended.target));ended.target.click();
   }
   container.addEventListener('pointerup',e=>finish(e));
@@ -311,6 +317,7 @@ function mountRail(container,selector,key,{axis='x',remember=true}={}){
   container.dataset.railKey=key;
 }
 export function mountGlassUI(root=document){
+  for(const rail of observedRails)if(!rail.isConnected){railObserver.unobserve(rail);observedRails.delete(rail);}
   root.querySelectorAll('input[type=date],input[type=month]').forEach(enhanceDate);
   root.querySelectorAll('select').forEach(enhanceSelect);
   root.querySelectorAll('input[type=number]').forEach(enhanceNumber);
@@ -335,7 +342,7 @@ document.addEventListener('keydown',e=>{
     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
   }
 },{capture:true});
-window.addEventListener('resize',()=>{closeGlassPopover(false);rails.clear();mountGlassUI();});
+window.addEventListener('resize',()=>{closeGlassPopover(false);mountGlassUI();});
 window.addEventListener('scroll',e=>{if(active&&!active.panel.contains(e.target))placePanel();},{capture:true,passive:true});
 window.visualViewport?.addEventListener('resize',placePanel);
 window.visualViewport?.addEventListener('scroll',placePanel);
